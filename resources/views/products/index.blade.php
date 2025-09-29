@@ -11,6 +11,7 @@
     @endif
 
     <a href="{{ route('products.create') }}" style="display: inline-block; margin-bottom: 1rem; font-weight: bold; color: #4f46e5;">Add New Product</a>
+    
 
     @if($products->count())
     <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 20px; width: 100%; border-collapse: collapse;">
@@ -31,9 +32,9 @@
                 <td>{{ number_format($product->price, 2) }}</td>
                 <td>{{ $product->stock }}</td>
                 <td>
-                    <a href="{{ route('products.edit', $product) }}" style="margin-right: 10px; color: #4f46e5;">Edit</a>
+                <a href="{{ route('products.edit', $product) }}">Edit</a>
 
-                    <form action="{{ route('products.destroy', $product) }}" method="POST" style="display:inline;">
+                <form action="{{ route('products.destroy', $product) }}" method="POST">
                         @csrf
                         @method('DELETE')
                         <button onclick="return confirm('Are you sure to delete this product?')" type="submit" style="background: none; border: none; color: red; cursor: pointer; padding: 0;">Delete</button>

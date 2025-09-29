@@ -43,7 +43,21 @@
            transition: background-color 0.3s;">
         + Add Product
     </a>
+    <a href="{{ route('orders.index') }}" 
+    style="
+        background-color: #28a745; 
+        color: white; 
+        padding: 10px 20px; 
+        border-radius: 4px; 
+        font-weight: 600; 
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+        transition: background-color 0.3s;">
+        🛒 View Orders
+    </a>
 
+    
     @if (count($products))
         <table style="width: 100%; border-collapse: collapse; border: 1px solid #dee2e6;">
             <thead style="background-color: #f8f9fa;">
