@@ -17,7 +17,6 @@ class OrderController extends Controller
         $this->middleware('auth');
     }
 
-    // Show list of all orders for this shop
     public function index()
     {
         $user = Auth::user();
@@ -30,14 +29,12 @@ class OrderController extends Controller
         return view('orders.index', compact('orders'));
     }
 
-    // Show form to create a new order
     public function create()
     {
         $products = Product::where('shop_id', Auth::user()->shop_id)->get();
         return view('orders.create', compact('products'));
     }
 
-    // Store new order
     public function store(Request $request)
     {
         $request->validate([
@@ -102,6 +99,80 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors('Order failed: ' . $e->getMessage());
+        }
+    }
+
+    // NEW: show order details
+    public function show($id)
+    {
+        $user = Auth::user();
+
+        $order = Order::with('items.product', 'user')
+            ->where('id', $id)
+            ->where('shop_id', $user->shop_id)
+            ->firstOrFail();
+
+        return view('orders.show', compact('order'));
+    }
+
+    // NEW: update status (including cancel -> restore stock)
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:placed,confirmed,cancelled,completed',
+        ]);
+
+        $user = Auth::user();
+        DB::beginTransaction();
+
+        try {
+            // lock the order and its products
+            $order = Order::with('items')->where('id', $id)->where('shop_id', $user->shop_id)->lockForUpdate()->firstOrFail();
+
+            $oldStatus = $order->status;
+            $newStatus = $request->input('status');
+
+            if ($oldStatus === $newStatus) {
+                DB::commit();
+                return redirect()->route('orders.show', $order->id)->with('info', 'No status change.');
+            }
+
+            // if cancelling from non-cancelled -> restore stock
+            if ($oldStatus !== 'cancelled' && $newStatus === 'cancelled') {
+                foreach ($order->items as $item) {
+                    $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
+                    if ($product) {
+                        $product->increment('stock', $item->quantity);
+                    }
+                }
+            }
+
+            // if moving from cancelled -> some other status, deduct stock again (careful)
+            if ($oldStatus === 'cancelled' && $newStatus !== 'cancelled') {
+                // ensure enough stock exists
+                foreach ($order->items as $item) {
+                    $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
+                    if (!$product || $product->stock < $item->quantity) {
+                        DB::rollBack();
+                        return back()->withErrors("Cannot change status — insufficient stock to re-confirm for product {$product->name}");
+                    }
+                }
+                // deduct stock
+                foreach ($order->items as $item) {
+                    $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
+                    $product->decrement('stock', $item->quantity);
+                }
+            }
+
+            $order->status = $newStatus;
+            $order->save();
+
+            DB::commit();
+
+            return redirect()->route('orders.show', $order->id)->with('success', 'Order status updated.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors('Status update failed: ' . $e->getMessage());
         }
     }
 }

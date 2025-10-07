@@ -21,6 +21,7 @@
                     <th>Status</th>
                     <th>Items</th>
                     <th>Date</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -28,7 +29,9 @@
                 <tr>
                     <td>#{{ $order->id }}</td>
                     <td>₹{{ $order->total_price }}</td>
-                    <td>{{ ucfirst($order->status) }}</td>
+                    <td>
+                        <span class="badge bg-info">{{ ucfirst($order->status) }}</span>
+                    </td>
                     <td>
                         <ul>
                             @foreach($order->items as $item)
@@ -37,6 +40,11 @@
                         </ul>
                     </td>
                     <td>{{ $order->created_at->format('d M Y h:i A') }}</td>
+                    <td>
+                        <a href="{{ route('orders.show', $order->id) }}" class="btn btn-sm btn-outline-primary">
+                            View Details
+                        </a>
+                    </td>
                 </tr>
                 @endforeach
             </tbody>
