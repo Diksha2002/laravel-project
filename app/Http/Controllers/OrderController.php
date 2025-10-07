@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Order;
@@ -13,9 +14,10 @@ class OrderController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth');  // Web session authentication
+        $this->middleware('auth');
     }
 
+    // Show list of all orders for this shop
     public function index()
     {
         $user = Auth::user();
@@ -28,13 +30,14 @@ class OrderController extends Controller
         return view('orders.index', compact('orders'));
     }
 
+    // Show form to create a new order
     public function create()
     {
-        // Only products of this shop
         $products = Product::where('shop_id', Auth::user()->shop_id)->get();
         return view('orders.create', compact('products'));
     }
 
+    // Store new order
     public function store(Request $request)
     {
         $request->validate([
@@ -51,22 +54,22 @@ class OrderController extends Controller
         try {
             $productIds = collect($productsInput)->pluck('id')->toArray();
 
-            // lock products for update (prevent race)
             $products = Product::where('shop_id', $shopId)
                 ->whereIn('id', $productIds)
                 ->lockForUpdate()
                 ->get();
 
             if ($products->count() !== count($productIds)) {
-                return back()->withErrors('One or more selected products are invalid for your shop.');
+                return back()->withErrors('Invalid products for this shop.');
             }
 
             $totalPrice = 0;
+
             foreach ($productsInput as $p) {
                 $prod = $products->where('id', $p['id'])->first();
                 if ($prod->stock < $p['quantity']) {
                     DB::rollBack();
-                    return back()->withErrors("Insufficient stock for product: {$prod->name}");
+                    return back()->withErrors("Insufficient stock for: {$prod->name}");
                 }
                 $totalPrice += $prod->price * $p['quantity'];
             }
@@ -88,13 +91,11 @@ class OrderController extends Controller
                     'price' => $prod->price,
                 ]);
 
-                // decrement stock safely
                 $prod->decrement('stock', $p['quantity']);
             }
 
             DB::commit();
 
-            // Queue job (mock confirmation)
             SendOrderConfirmationJob::dispatch($order);
 
             return redirect()->route('orders.index')->with('success', 'Order placed successfully.');
